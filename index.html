@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>极简屏幕共享</title>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, sans-serif;
+            background: #0d1117;
+            color: #c9d1d9;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 30px;
+            background: linear-gradient(135deg, #58a6ff, #a371f7);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .video-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .video-box {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .video-box h3 {
+            padding: 12px 16px;
+            background: #21262d;
+            font-size: 0.9rem;
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+        }
+
+        .video-box video {
+            width: 100%;
+            height: 300px;
+            background: #0d1117;
+            display: block;
+        }
+
+        .video-box .placeholder {
+            width: 100%;
+            height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #484f58;
+            font-size: 0.9rem;
+        }
+
+        .controls {
+            background: #161b22;
+            border: 1px solid #30363d;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+
+        .control-row:last-child {
+            margin-bottom: 0;
+        }
+
+        input[type="text"] {
+            flex: 1;
+            min-width: 200px;
+            padding: 10px 14px;
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 6px;
+            color: #c9d1d9;
+            font-size: 0.95rem;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        input[type="text"]:focus {
+            border-color: #58a6ff;
+        }
+
+        input[type="text"]::placeholder {
+            color: #484f58;
+        }
+
+        button {
+            padding: 10px 20px;
+            background: linear-gradient(135deg, #238636, #2ea043);
+            border: none;
+            border-radius: 6px;
+            color: #fff;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+
+        button:hover {
+            opacity: 0.85;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: linear-gradient(135deg, #1f6feb, #388bfd);
+        }
+
+        button.danger {
+            background: linear-gradient(135deg, #da3633, #f85149);
+        }
+
+        .share-code {
+            background: #0d1117;
+            border: 2px dashed #30363d;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            margin-top: 16px;
+            display: none;
+        }
+
+        .share-code.show {
+            display: block;
+        }
+
+        .share-code .code {
+            font-size: 1.8rem;
+            font-weight: bold;
+            color: #58a6ff;
+            letter-spacing: 4px;
+            margin: 8px 0;
+            word-break: break-all;
+        }
+
+        .share-code .hint {
+            font-size: 0.8rem;
+            color: #8b949e;
+        }
+
+        .status {
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            margin-top: 12px;
+            display: none;
+        }
+
+        .status.show {
+            display: block;
+        }
+
+        .status.info {
+            background: rgba(56, 139, 253, 0.15);
+            border: 1px solid rgba(56, 139, 253, 0.4);
+            color: #58a6ff;
+        }
+
+        .status.success {
+            background: rgba(46, 160, 67, 0.15);
+            border: 1px solid rgba(46, 160, 67, 0.4);
+            color: #3fb950;
+        }
+
+        .status.error {
+            background: rgba(248, 81, 73, 0.15);
+            border: 1px solid rgba(248, 81, 73, 0.4);
+            color: #f85149;
+        }
+
+        @media (max-width: 768px) {
+            .video-section {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>极简屏幕共享</h1>
+
+        <div class="video-section">
+            <div class="video-box">
+                <h3>我的屏幕预览</h3>
+                <video id="myVideo" autoplay muted playsinline></video>
+                <div id="myPlaceholder" class="placeholder">点击"开始共享屏幕"按钮</div>
+            </div>
+            <div class="video-box">
+                <h3>对方屏幕</h3>
+                <video id="remoteVideo" autoplay playsinline></video>
+                <div id="remotePlaceholder" class="placeholder">等待对方连接...</div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-row">
+                <button id="generateBtn">生成共享码</button>
+                <button id="shareBtn" disabled>开始共享屏幕</button>
+                <button id="stopBtn" class="danger" disabled>停止共享</button>
+            </div>
+
+            <div class="share-code" id="shareCodeBox">
+                <div class="hint">分享此码给朋友</div>
+                <div class="code" id="shareCode"></div>
+                <div class="hint">等待连接中...</div>
+            </div>
+
+            <div class="control-row">
+                <input type="text" id="remoteIdInput" placeholder="输入对方共享码">
+                <button id="connectBtn" class="secondary">连接并观看</button>
+            </div>
+
+            <div class="status" id="statusBox"></div>
+        </div>
+    </div>
+
+    <script>
+        let peer = null;
+        let myStream = null;
+        let currentCall = null;
+
+        const myVideo = document.getElementById('myVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const myPlaceholder = document.getElementById('myPlaceholder');
+        const remotePlaceholder = document.getElementById('remotePlaceholder');
+        const generateBtn = document.getElementById('generateBtn');
+        const shareBtn = document.getElementById('shareBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const connectBtn = document.getElementById('connectBtn');
+        const remoteIdInput = document.getElementById('remoteIdInput');
+        const shareCodeBox = document.getElementById('shareCodeBox');
+        const shareCode = document.getElementById('shareCode');
+        const statusBox = document.getElementById('statusBox');
+
+        function showStatus(message, type = 'info') {
+            statusBox.textContent = message;
+            statusBox.className = `status show ${type}`;
+        }
+
+        function generateRandomId() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
+            let result = '';
+            for (let i = 0; i < 6; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return result;
+        }
+
+        generateBtn.addEventListener('click', () => {
+            if (peer) {
+                peer.destroy();
+            }
+
+            const randomId = generateRandomId();
+            peer = new Peer(randomId);
+
+            peer.on('open', (id) => {
+                shareCode.textContent = id;
+                shareCodeBox.classList.add('show');
+                generateBtn.disabled = true;
+                shareBtn.disabled = false;
+                showStatus(`共享码已生成: ${id}`, 'success');
+            });
+
+            peer.on('error', (err) => {
+                showStatus(`连接错误: ${err.message}`, 'error');
+            });
+
+            peer.on('call', (call) => {
+                if (myStream) {
+                    call.answer(myStream);
+                }
+                handleCall(call);
+            });
+        });
+
+        shareBtn.addEventListener('click', async () => {
+            try {
+                myStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: true,
+                    audio: false
+                });
+
+                myVideo.srcObject = myStream;
+                myPlaceholder.style.display = 'none';
+                myVideo.style.display = 'block';
+                stopBtn.disabled = false;
+                shareBtn.disabled = true;
+
+                showStatus('正在共享您的屏幕...', 'info');
+
+                myStream.getVideoTracks()[0].onended = () => {
+                    stopSharing();
+                };
+
+                if (currentCall) {
+                    currentCall.answer(myStream);
+                }
+            } catch (err) {
+                showStatus('无法获取屏幕: ' + err.message, 'error');
+            }
+        });
+
+        stopBtn.addEventListener('click', () => {
+            stopSharing();
+        });
+
+        function stopSharing() {
+            if (myStream) {
+                myStream.getVideoTracks().forEach(track => track.stop());
+                myStream = null;
+            }
+            myVideo.srcObject = null;
+            myVideo.style.display = 'none';
+            myPlaceholder.style.display = 'flex';
+            stopBtn.disabled = true;
+            shareBtn.disabled = false;
+            showStatus('已停止共享屏幕', 'info');
+        }
+
+        connectBtn.addEventListener('click', () => {
+            const remoteId = remoteIdInput.value.trim();
+            if (!remoteId) {
+                showStatus('请输入共享码', 'error');
+                return;
+            }
+
+            if (!peer) {
+                peer = new Peer();
+                peer.on('open', () => {
+                    makeCall(remoteId);
+                });
+                peer.on('error', (err) => {
+                    showStatus(`连接错误: ${err.message}`, 'error');
+                });
+            } else {
+                makeCall(remoteId);
+            }
+        });
+
+        function makeCall(remoteId) {
+            if (!myStream) {
+                showStatus('请先生成共享码并点击"开始共享屏幕"', 'error');
+                return;
+            }
+
+            showStatus('正在连接...', 'info');
+            const call = peer.call(remoteId, myStream);
+            handleCall(call);
+        }
+
+        function handleCall(call) {
+            currentCall = call;
+
+            call.on('stream', (stream) => {
+                remoteVideo.srcObject = stream;
+                remotePlaceholder.style.display = 'none';
+                remoteVideo.style.display = 'block';
+                showStatus('已连接到对方屏幕', 'success');
+            });
+
+            call.on('close', () => {
+                remoteVideo.srcObject = null;
+                remoteVideo.style.display = 'none';
+                remotePlaceholder.style.display = 'flex';
+                showStatus('对方已断开连接', 'info');
+            });
+
+            call.on('error', (err) => {
+                showStatus(`通话错误: ${err.message}`, 'error');
+            });
+        }
+    </script>
+</body>
+</html>
