@@ -255,6 +255,7 @@
         let peer = null;
         let myStream = null;
         let currentCall = null;
+        let pendingCall = null;
 
         const myVideo = document.getElementById('myVideo');
         const remoteVideo = document.getElementById('remoteVideo');
@@ -306,6 +307,9 @@
             peer.on('call', (call) => {
                 if (myStream) {
                     call.answer(myStream);
+                } else {
+                    pendingCall = call;
+                    showStatus('等待对方开启屏幕共享...', 'info');
                 }
                 handleCall(call);
             });
@@ -330,8 +334,10 @@
                     stopSharing();
                 };
 
-                if (currentCall) {
-                    currentCall.answer(myStream);
+                if (pendingCall) {
+                    pendingCall.answer(myStream);
+                    pendingCall = null;
+                    showStatus('已开始共享屏幕给对方', 'success');
                 }
             } catch (err) {
                 showStatus('无法获取屏幕: ' + err.message, 'error');
@@ -376,13 +382,8 @@
         });
 
         function makeCall(remoteId) {
-            if (!myStream) {
-                showStatus('请先生成共享码并点击"开始共享屏幕"', 'error');
-                return;
-            }
-
             showStatus('正在连接...', 'info');
-            const call = peer.call(remoteId, myStream);
+            const call = peer.call(remoteId, myStream || new MediaStream());
             handleCall(call);
         }
 
